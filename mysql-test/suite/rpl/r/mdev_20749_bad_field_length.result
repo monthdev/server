@@ -1,0 +1,6 @@
+#
+# MDEV-20749 improve flashback row decode diagnostics (bad field length)
+#
+create table t1 (a int, b blob) engine=innodb;
+insert into t1 values (1, repeat("a",3104));
+Error decoding row image while converting event for --flashback: event=WRITE_ROWS_EVENT, image=row image, end_log_pos=0, column=0, row_offset=0, field_offset=1, column_type=3, metadata=0, reason=could not determine field length

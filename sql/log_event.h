@@ -4831,10 +4831,11 @@ public:
                                PRINT_EVENT_INFO *print_event_info,
                                MY_BITMAP *cols_bitmap,
                                const uchar *ptr, const uchar *prefix);
-  size_t calc_row_event_length(table_def *td,
-                               MY_BITMAP *cols_bitmap,
-                               const uchar *value,
-                               Field_info *fields);
+  size_t calc_row_event_length(table_def *td, MY_BITMAP *cols_bitmap,
+                               const uchar *value, Field_info *fields,
+                               Log_event_type ev_type= UNKNOWN_EVENT,
+                               const char *image_name= nullptr,
+                               ulonglong event_log_pos= 0);
   void count_row_events(PRINT_EVENT_INFO *print_event_info);
 
 #endif

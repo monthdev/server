@@ -1,0 +1,12 @@
+--echo #
+--echo # MDEV-20749 improve flashback row decode diagnostics (bad field length)
+--echo #
+
+--source include/have_innodb.inc
+--source include/have_binlog_format_row.inc
+--source include/have_debug.inc
+
+create table t1 (a int, b blob) engine=innodb;
+insert into t1 values (1, repeat("a",3104));
+
+--exec sh -c '$MYSQL_BINLOG --debug="d,flashback_force_row_decode_bad_field_length" -vvv --flashback $MYSQLTEST_VARDIR/mysqld.1/data/master-bin.000001 2>&1 || true' | grep "Error decoding row image"

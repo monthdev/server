@@ -1168,9 +1168,12 @@ void Rows_log_event::change_to_flashback_event(PRINT_EVENT_INFO *print_event_inf
   {
     uchar *start_pos= value;
     size_t length1= 0;
-    if (!(length1= calc_row_event_length(td, &m_cols, value, bi_fields)))
+    const bool IsUpdate=
+        ev_type == UPDATE_ROWS_EVENT || ev_type == UPDATE_ROWS_EVENT_V1;
+    const char *image1_name= IsUpdate ? "before image" : "row image";
+    if (!(length1= calc_row_event_length(td, &m_cols, value, bi_fields,
+                                         ev_type, image1_name, this->log_pos)))
     {
-      fprintf(stderr, "\nError row length: %zu\n", length1);
       exit(1);
     }
     value+= length1;
@@ -1180,9 +1183,10 @@ void Rows_log_event::change_to_flashback_event(PRINT_EVENT_INFO *print_event_inf
     if (ev_type == UPDATE_ROWS_EVENT ||
         ev_type == UPDATE_ROWS_EVENT_V1)
     {
-      if (!(length2= calc_row_event_length(td, &m_cols_ai, value, ai_fields)))
+      if (!(length2=
+                calc_row_event_length(td, &m_cols_ai, value, ai_fields,
+                                      ev_type, "after image", this->log_pos)))
       {
-        fprintf(stderr, "\nError row length: %zu\n", length2);
         exit(1);
       }
       value+= length2;
@@ -1378,6 +1382,24 @@ static size_t calc_field_event_length(const uchar *ptr, uint type, uint meta)
   return 0;
 }
 
+static const char *rows_event_name(Log_event_type type)
+{
+  switch (type)
+  {
+  case WRITE_ROWS_EVENT:
+  case WRITE_ROWS_EVENT_V1:
+    return "WRITE_ROWS_EVENT";
+  case UPDATE_ROWS_EVENT:
+  case UPDATE_ROWS_EVENT_V1:
+    return "UPDATE_ROWS_EVENT";
+  case DELETE_ROWS_EVENT:
+  case DELETE_ROWS_EVENT_V1:
+    return "DELETE_ROWS_EVENT";
+  default:
+    return "ROWS_EVENT";
+  }
+}
+
 /**
   It parses a row image and returns its length and information of
   columns if 'fields' is not null.
@@ -1389,11 +1411,10 @@ static size_t calc_field_event_length(const uchar *ptr, uint type, uint meta)
 
   @return  length of the parsed row image if succeeds, otherwise 0 is returned.
  */
-size_t
-Rows_log_event::calc_row_event_length(table_def *td,
-                                      MY_BITMAP *cols_bitmap,
-                                      const uchar *value,
-                                      Field_info *fields)
+size_t Rows_log_event::calc_row_event_length(
+    table_def *td, MY_BITMAP *cols_bitmap, const uchar *value,
+    Field_info *fields, Log_event_type ev_type, const char *image_name,
+    ulonglong event_log_pos)
 {
   const uchar *value0= value;
   const uchar *null_bits= value;
@@ -1418,14 +1439,64 @@ Rows_log_event::calc_row_event_length(table_def *td,
     {
       size_t size;
       size_t fsize= td->calc_field_size((uint)i, (uchar*) value);
+#ifndef DBUG_OFF
+      if (DBUG_IF("flashback_force_row_decode_truncated"))
+      {
+        fprintf(stderr,
+                "\nError decoding row image while converting event for "
+                "--flashback: event=%s, image=%s, end_log_pos=%llu, "
+                "column=%u, row_offset=%zu, field_offset=%zu, "
+                "expected_field_size=%zu, remaining_bytes=%zu, "
+                "reason=field extends past row buffer\n",
+                rows_event_name(ev_type), image_name, event_log_pos, i,
+                (size_t) (value0 - m_rows_buf), (size_t) (value - value0),
+                fsize, (size_t) (m_rows_end - value));
+        return 0;
+      }
+
+      if (DBUG_IF("flashback_force_row_decode_bad_field_length"))
+      {
+        fprintf(stderr,
+                "\nError decoding row image while converting event for "
+                "--flashback: event=%s, image=%s, end_log_pos=%llu, "
+                "column=%u, row_offset=%zu, field_offset=%zu, "
+                "column_type=%u, metadata=%u, "
+                "reason=could not determine field length\n",
+                rows_event_name(ev_type), image_name, event_log_pos, i,
+                (size_t) (value0 - m_rows_buf), (size_t) (value - value0),
+                (uint) td->type(i), (uint) td->field_metadata(i));
+        return 0;
+      }
+#endif
       if (value + fsize > m_rows_end)
       {
-        /* Corrupted replication event was detected, skipping entry */
+        /* corrupted replication event was detected, skipping entry */
+        fprintf(stderr,
+                "\nError decoding row image while converting event for "
+                "--flashback: "
+                "event=%s, image=%s, log_pos=%llu, column=%u, "
+                "row_offset=%zu, field_offset=%zu, expected_field_size=%zu, "
+                "remaining_bytes=%zu, reason=field extends past row buffer\n",
+                rows_event_name(ev_type), image_name, event_log_pos, i,
+                (size_t) (value0 - m_rows_buf), (size_t) (value - value0),
+                fsize, (size_t) (m_rows_end - value));
         return 0;
       }
       if (!(size= calc_field_event_length(value, td->type(i),
                                           td->field_metadata(i))))
+      {
+        fprintf(
+            stderr,
+            "\nError decoding row image while converting event for "
+            "--flashback: "
+            "event=%s, image=%s, log_pos=%llu, column=%u, "
+            "row_offset=%zu, field_offset=%zu, column_type=%u, metadata=%u, "
+            "reason=could not determine field length\n",
+            rows_event_name(ev_type), image_name, event_log_pos, i,
+            (size_t) (value0 - m_rows_buf), (size_t) (value - value0),
+            (uint) td->type(i), (uint) td->field_metadata(i));
         return 0;
+      }
 
       if (fields)
       {
