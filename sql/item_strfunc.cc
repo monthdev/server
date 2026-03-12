@@ -4617,35 +4617,6 @@ String *get_xxh_input(Item *arg, String *value, String *converted_value,
 
   return converted_value;
 }
-
-static void xxh3_128_hash_str(my_hasher_st *hasher, const uchar *key,
-                              size_t len)
-{
-  XXH3_128bits_update((XXH3_state_t *) hasher->m_specific, key, len);
-}
-
-static void xxh3_128_hash_byte(my_hasher_st *hasher, uchar value)
-{
-  XXH3_128bits_update((XXH3_state_t *) hasher->m_specific, &value, 1);
-}
-
-static my_hasher_st my_hasher_xxh3_128_local()
-{
-  my_hasher_st tmp{};
-
-  tmp.m_nr1= 1;
-  tmp.m_nr2= 4;
-  tmp.m_nr= 0;
-  tmp.m_streaming= FALSE;
-  tmp.m_hash_str= xxh3_128_hash_str;
-  tmp.m_hash_byte= xxh3_128_hash_byte;
-  tmp.m_hash_num= nullptr;
-  tmp.m_finalize= nullptr;
-  tmp.m_specific= (void *) XXH3_createState();
-
-  XXH3_128bits_reset((XXH3_state_t *) tmp.m_specific);
-  return tmp;
-}
 } // namespace
 
 String *Item_func_xxh32::val_str_ascii(String *to)
@@ -4661,11 +4632,10 @@ String *Item_func_xxh32::val_str_ascii(String *to)
   xxh_charset->hash_sort(
       &hasher, reinterpret_cast<const uchar *>(input->ptr()), input->length());
 
-  const XXH32_hash_t hash= XXH32_digest((XXH32_state_t *) hasher.m_specific);
-  XXH32_freeState((XXH32_state_t *) hasher.m_specific);
+  const uint64_t hash= hasher.m_finalize(&hasher);
 
   XXH32_canonical_t canonical;
-  XXH32_canonicalFromHash(&canonical, hash);
+  XXH32_canonicalFromHash(&canonical, (XXH32_hash_t) hash);
   bytes_to_hex_lower(canonical.digest, sizeof(canonical.digest), to);
   return to;
 }
@@ -4683,35 +4653,10 @@ String *Item_func_xxh3::val_str_ascii(String *to)
   xxh_charset->hash_sort(
       &hasher, reinterpret_cast<const uchar *>(input->ptr()), input->length());
 
-  const XXH64_hash_t hash=
-      XXH3_64bits_digest((XXH3_state_t *) hasher.m_specific);
-  XXH3_freeState((XXH3_state_t *) hasher.m_specific);
+  const uint64_t hash= hasher.m_finalize(&hasher);
 
   XXH64_canonical_t canonical;
-  XXH64_canonicalFromHash(&canonical, hash);
-  bytes_to_hex_lower(canonical.digest, sizeof(canonical.digest), to);
-  return to;
-}
-
-String *Item_func_xxh3_128::val_str_ascii(String *to)
-{
-  DBUG_ASSERT(fixed());
-  DBUG_ASSERT(arg_count == 1);
-
-  String *input= get_xxh_input(args[0], &value, &converted_value, &null_value);
-  if (!input)
-    return nullptr;
-
-  my_hasher_st hasher= my_hasher_xxh3_128_local();
-  xxh_charset->hash_sort(
-      &hasher, reinterpret_cast<const uchar *>(input->ptr()), input->length());
-
-  const XXH128_hash_t hash=
-      XXH3_128bits_digest((XXH3_state_t *) hasher.m_specific);
-  XXH3_freeState((XXH3_state_t *) hasher.m_specific);
-
-  XXH128_canonical_t canonical;
-  XXH128_canonicalFromHash(&canonical, hash);
+  XXH64_canonicalFromHash(&canonical, (XXH64_hash_t) hash);
   bytes_to_hex_lower(canonical.digest, sizeof(canonical.digest), to);
   return to;
 }
