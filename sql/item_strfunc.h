@@ -2320,10 +2320,11 @@ protected:
 class Item_func_xxh32 : public Item_str_ascii_checksum_func
 {
   String value;
-  String converted_value;
+
 public:
-  Item_func_xxh32(THD *thd, Item *arg)
-    : Item_str_ascii_checksum_func(thd, arg) {}
+  Item_func_xxh32(THD *thd, Item *arg) : Item_str_ascii_checksum_func(thd, arg)
+  {
+  }
 
   String *val_str_ascii(String *to) override;
 
@@ -2335,7 +2336,7 @@ public:
 
   LEX_CSTRING func_name_cstring() const override
   {
-    static LEX_CSTRING name= { STRING_WITH_LEN("XXH32") };
+    static LEX_CSTRING name= {STRING_WITH_LEN("XXH32")};
     return name;
   }
 
@@ -2348,10 +2349,11 @@ public:
 class Item_func_xxh3 : public Item_str_ascii_checksum_func
 {
   String value;
-  String converted_value;
+
 public:
-  Item_func_xxh3(THD *thd, Item *arg)
-    : Item_str_ascii_checksum_func(thd, arg) {}
+  Item_func_xxh3(THD *thd, Item *arg) : Item_str_ascii_checksum_func(thd, arg)
+  {
+  }
 
   String *val_str_ascii(String *to) override;
 
@@ -2363,41 +2365,13 @@ public:
 
   LEX_CSTRING func_name_cstring() const override
   {
-    static LEX_CSTRING name= { STRING_WITH_LEN("XXH3") };
+    static LEX_CSTRING name= {STRING_WITH_LEN("XXH3")};
     return name;
   }
 
   Item *shallow_copy(THD *thd) const override
   {
     return get_item_copy<Item_func_xxh3>(thd, this);
-  }
-};
-
-class Item_func_xxh3_128 : public Item_str_ascii_checksum_func
-{
-  String value;
-  String converted_value;
-public:
-  Item_func_xxh3_128(THD *thd, Item *arg)
-    : Item_str_ascii_checksum_func(thd, arg) {}
-
-  String *val_str_ascii(String *to) override;
-
-  bool fix_length_and_dec(THD *) override
-  {
-    fix_length_and_charset(32, default_charset());
-    return false;
-  }
-
-  LEX_CSTRING func_name_cstring() const override
-  {
-    static LEX_CSTRING name= { STRING_WITH_LEN("XXH3_128") };
-    return name;
-  }
-
-  Item *shallow_copy(THD *thd) const override
-  {
-    return get_item_copy<Item_func_xxh3_128>(thd, this);
   }
 };
 

@@ -4573,8 +4573,6 @@ longlong Item_func_crc32::val_int()
 
 namespace
 {
-constexpr CHARSET_INFO *xxh_charset= &my_charset_utf8mb4_general_ci;
-
 void bytes_to_hex_lower(const unsigned char *digest, size_t length, String *to)
 {
   static const char hex[]= "0123456789abcdef";
@@ -4590,33 +4588,6 @@ void bytes_to_hex_lower(const unsigned char *digest, size_t length, String *to)
 
   to->copy(buffer, length * 2, &my_charset_latin1);
 }
-
-String *get_xxh_input(Item *arg, String *value, String *converted_value,
-                      bool *null_value)
-{
-  String *input= arg->val_str(value);
-  if (!input)
-  {
-    *null_value= true;
-    return nullptr;
-  }
-
-  *null_value= false;
-
-  if (input->charset() == xxh_charset)
-    return input;
-
-  uint errors= 0;
-  converted_value->length(0);
-  if (converted_value->copy(input->ptr(), input->length(), input->charset(),
-                            xxh_charset, &errors))
-  {
-    *null_value= true;
-    return nullptr;
-  }
-
-  return converted_value;
-}
 } // namespace
 
 String *Item_func_xxh32::val_str_ascii(String *to)
@@ -4624,14 +4595,18 @@ String *Item_func_xxh32::val_str_ascii(String *to)
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
-  String *input= get_xxh_input(args[0], &value, &converted_value, &null_value);
+  String *input= args[0]->val_str(&value);
   if (!input)
-    return nullptr;
-
+  { 
+    null_value= true;
+    return nullptr; 
+  }
+  null_value= false;
   my_hasher_st hasher= my_hasher_xxh32();
-  xxh_charset->hash_sort(
-      &hasher, reinterpret_cast<const uchar *>(input->ptr()), input->length());
-
+  input->charset()->hash_sort(
+    &hasher,
+    reinterpret_cast<const uchar *>(input->ptr()),
+    input->length());
   const uint64_t hash= hasher.m_finalize(&hasher);
 
   XXH32_canonical_t canonical;
@@ -4645,13 +4620,18 @@ String *Item_func_xxh3::val_str_ascii(String *to)
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
-  String *input= get_xxh_input(args[0], &value, &converted_value, &null_value);
+  String *input= args[0]->val_str(&value);
   if (!input)
-    return nullptr;
-
+  { 
+    null_value= true;
+    return nullptr; 
+  }
+  null_value= false;
   my_hasher_st hasher= my_hasher_xxh3();
-  xxh_charset->hash_sort(
-      &hasher, reinterpret_cast<const uchar *>(input->ptr()), input->length());
+  input->charset()->hash_sort(
+    &hasher,
+    reinterpret_cast<const uchar *>(input->ptr()),
+    input->length());
 
   const uint64_t hash= hasher.m_finalize(&hasher);
 
