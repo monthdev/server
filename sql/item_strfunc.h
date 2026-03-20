@@ -2317,20 +2317,21 @@ protected:
   { return get_item_copy<Item_func_crc32>(thd, this); }
 };
 
-class Item_func_xxh32 : public Item_str_ascii_checksum_func
+class Item_func_xxh32 : public Item_long_func
 {
   String value;
-
 public:
-  Item_func_xxh32(THD *thd, Item *arg) : Item_str_ascii_checksum_func(thd, arg)
+  Item_func_xxh32(THD *thd, Item *arg) : Item_long_func(thd, arg)
   {
+    unsigned_flag= true;
   }
 
-  String *val_str_ascii(String *to) override;
+  longlong val_int() override;
 
   bool fix_length_and_dec(THD *) override
   {
-    fix_length_and_charset(8, default_charset());
+    max_length= 10;
+    set_maybe_null();
     return false;
   }
 
@@ -2346,20 +2347,21 @@ public:
   }
 };
 
-class Item_func_xxh3 : public Item_str_ascii_checksum_func
+class Item_func_xxh3 : public Item_longlong_func
 {
   String value;
-
 public:
-  Item_func_xxh3(THD *thd, Item *arg) : Item_str_ascii_checksum_func(thd, arg)
+  Item_func_xxh3(THD *thd, Item *arg) : Item_longlong_func(thd, arg)
   {
+    unsigned_flag= true;
   }
 
-  String *val_str_ascii(String *to) override;
+  longlong val_int() override;
 
   bool fix_length_and_dec(THD *) override
   {
-    fix_length_and_charset(16, default_charset());
+    max_length= 20;
+    set_maybe_null();
     return false;
   }
 

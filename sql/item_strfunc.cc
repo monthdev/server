@@ -4571,74 +4571,50 @@ longlong Item_func_crc32::val_int()
     (ulonglong{crc_func(uint32_t(crc), res->ptr(), res->length())});
 }
 
-namespace
-{
-void bytes_to_hex_lower(const unsigned char *digest, size_t length, String *to)
-{
-  static const char hex[]= "0123456789abcdef";
-  char buffer[32 * 2];
-
-  DBUG_ASSERT(length * 2 <= sizeof(buffer));
-
-  for (size_t i= 0; i < length; ++i)
-  {
-    buffer[i * 2]= hex[digest[i] >> 4];
-    buffer[i * 2 + 1]= hex[digest[i] & 0x0f];
-  }
-
-  to->copy(buffer, length * 2, &my_charset_latin1);
-}
-} // namespace
-
-String *Item_func_xxh32::val_str_ascii(String *to)
+longlong Item_func_xxh32::val_int()
 {
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
   String *input= args[0]->val_str(&value);
   if (!input)
-  { 
+  {
     null_value= true;
-    return nullptr; 
+    return 0;
   }
+
   null_value= false;
+
   my_hasher_st hasher= my_hasher_xxh32();
   input->charset()->hash_sort(
-    &hasher,
-    reinterpret_cast<const uchar *>(input->ptr()),
-    input->length());
-  const uint64_t hash= hasher.m_finalize(&hasher);
+      &hasher,
+      reinterpret_cast<const uchar *>(input->ptr()),
+      input->length());
 
-  XXH32_canonical_t canonical;
-  XXH32_canonicalFromHash(&canonical, (XXH32_hash_t) hash);
-  bytes_to_hex_lower(canonical.digest, sizeof(canonical.digest), to);
-  return to;
+  return (longlong) (uint32) hasher.m_finalize(&hasher);
 }
 
-String *Item_func_xxh3::val_str_ascii(String *to)
+longlong Item_func_xxh3::val_int()
 {
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
   String *input= args[0]->val_str(&value);
   if (!input)
-  { 
+  {
     null_value= true;
-    return nullptr; 
+    return 0;
   }
+
   null_value= false;
+
   my_hasher_st hasher= my_hasher_xxh3();
   input->charset()->hash_sort(
-    &hasher,
-    reinterpret_cast<const uchar *>(input->ptr()),
-    input->length());
+      &hasher,
+      reinterpret_cast<const uchar *>(input->ptr()),
+      input->length());
 
-  const uint64_t hash= hasher.m_finalize(&hasher);
-
-  XXH64_canonical_t canonical;
-  XXH64_canonicalFromHash(&canonical, (XXH64_hash_t) hash);
-  bytes_to_hex_lower(canonical.digest, sizeof(canonical.digest), to);
-  return to;
+  return (longlong) (ulonglong) hasher.m_finalize(&hasher);
 }
 
 #ifdef HAVE_COMPRESS
