@@ -1,5 +1,9 @@
 --echo #
---echo # MDEV-20749 improve flashback row decode diagnostics
+--echo # MDEV-20749 corrupted BLOB length prefix should report truncated row image
+--echo # The server-side DBUG hook corrupts the serialized row image written to
+--echo # the binary log by increasing the BLOB length prefix without changing
+--echo # the event size. mariadb-binlog --flashback should then report that the
+--echo # field extends past the row buffer while decoding the WRITE_ROWS_EVENT.
 --echo #
 
 --source include/have_innodb.inc
@@ -7,6 +11,10 @@
 --source include/have_debug.inc
 
 create table t1 (a int, b blob) engine=innodb;
-insert into t1 values (1, repeat("a",3104));
 
---exec sh -c '$MYSQL_BINLOG --debug="d,flashback_force_row_decode_truncated" -vvv --flashback $MYSQLTEST_VARDIR/mysqld.1/data/master-bin.000001 2>&1 || true' | grep "Error decoding row image"
+set @old_dbug= @@debug_dbug;
+set debug_dbug= "+d,flashback_corrupt_blob_length_prefix";
+insert into t1 values (1, repeat("a",3104));
+set debug_dbug= @old_dbug;
+
+--exec sh -c '$MYSQL_BINLOG -vvv --flashback $MYSQLTEST_VARDIR/mysqld.1/data/master-bin.000001 2>&1 || true' | grep "Error decoding row image"
