@@ -48,7 +48,6 @@ my_hasher_st my_hasher_xxh32(void)
     { {.m_nr = 0}, FALSE, my_hasher_xxh32_hash_str, my_hasher_xxh32_hash_byte,
       my_hasher_hash_num, my_hasher_xxh32_finalize,
       (void *) XXH32_createState() };
-  XXH32_reset((XXH32_state_t *) tmp.m_specific, 0);
   return tmp;
 }
 
@@ -92,6 +91,5 @@ my_hasher_st my_hasher_xxh3(void)
     { {.m_nr = 0}, FALSE, my_hasher_xxh3_hash_str, my_hasher_xxh3_hash_byte,
       my_hasher_hash_num, my_hasher_xxh3_finalize,
       (void *) XXH3_createState() };
-  XXH3_64bits_reset((XXH3_state_t *) tmp.m_specific);
   return tmp;
 }

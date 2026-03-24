@@ -1,0 +1,56 @@
+--source include/have_partition.inc
+--echo # XXH SQL functions preserve KEY partitioning behavior
+
+--echo ## XXH32 preserves KEY partitioning collation behavior
+CREATE TABLE t1 (a VARCHAR(10) CHARACTER SET koi8u COLLATE koi8u_general_ci);
+INSERT INTO t1 VALUES (0x20),(0x60),(0x6060),(0x606060);
+SELECT HEX(a) FROM t1 WHERE a=0x60;
+ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH32 (a) PARTITIONS 3;
+SELECT HEX(a) FROM t1 WHERE a=0x60;
+DROP TABLE t1;
+
+--echo ## XXH3 preserves KEY partitioning collation behavior
+CREATE TABLE t1 (a VARCHAR(10) CHARACTER SET koi8u COLLATE koi8u_general_ci);
+INSERT INTO t1 VALUES (0x20),(0x60),(0x6060),(0x606060);
+SELECT HEX(a) FROM t1 WHERE a=0x60;
+ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH3 (a) PARTITIONS 3;
+SELECT HEX(a) FROM t1 WHERE a=0x60;
+DROP TABLE t1;
+
+--echo ## XXH32 partitioning distribution for numeric values
+CREATE OR REPLACE TABLE t1 (c1 INT NOT NULL)
+PARTITION BY KEY ALGORITHM=XXH32 (c1) PARTITIONS 16;
+INSERT INTO t1 VALUES (0x41),(0x61);
+SELECT COUNT(*) AS xxh32_nonempty_parts_16
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+SELECT SUM(table_rows) AS xxh32_rows_16
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH32 (c1) PARTITIONS 7;
+SELECT COUNT(*) AS xxh32_nonempty_parts_7
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+SELECT SUM(table_rows) AS xxh32_rows_7
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+DROP TABLE t1;
+
+--echo ## XXH3 partitioning distribution for numeric values
+CREATE OR REPLACE TABLE t1 (c1 INT NOT NULL)
+PARTITION BY KEY ALGORITHM=XXH3 (c1) PARTITIONS 16;
+INSERT INTO t1 VALUES (0x41),(0x61);
+SELECT COUNT(*) AS xxh3_nonempty_parts_16
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+SELECT SUM(table_rows) AS xxh3_rows_16
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH3 (c1) PARTITIONS 7;
+SELECT COUNT(*) AS xxh3_nonempty_parts_7
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+SELECT SUM(table_rows) AS xxh3_rows_7
+FROM information_schema.partitions
+WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
+DROP TABLE t1;

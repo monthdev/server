@@ -43,7 +43,6 @@
                                 // my_make_scrambled_password_323
 #include <m_ctype.h>
 #include <my_md5.h>
-#include "../mysys/xxhash.h"
 C_MODE_START
 #include "../mysys/my_static.h"			// For soundex_map
 C_MODE_END
@@ -4591,7 +4590,7 @@ longlong Item_func_xxh32::val_int()
       reinterpret_cast<const uchar *>(input->ptr()),
       input->length());
 
-  return (longlong) (uint32) hasher.m_finalize(&hasher);
+  return (longlong) hasher.m_finalize(&hasher);
 }
 
 longlong Item_func_xxh3::val_int()
@@ -4614,7 +4613,7 @@ longlong Item_func_xxh3::val_int()
       reinterpret_cast<const uchar *>(input->ptr()),
       input->length());
 
-  return (longlong) (ulonglong) hasher.m_finalize(&hasher);
+  return (longlong) hasher.m_finalize(&hasher);
 }
 
 #ifdef HAVE_COMPRESS
