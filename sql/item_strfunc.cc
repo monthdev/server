@@ -4570,27 +4570,70 @@ longlong Item_func_crc32::val_int()
     (ulonglong{crc_func(uint32_t(crc), res->ptr(), res->length())});
 }
 
+namespace
+{
+bool hash_xxh_arg(Hasher *hasher, Item *arg, String *value, bool *null_value)
+{
+  if (Item_field *item_field= arg->real_item()->field_for_view_update())
+  {
+    Field *field= item_field->field;
+    if (!field)
+    {
+      *null_value= true;
+      return false;
+    }
+
+    field->hash(hasher);
+    *null_value= field->is_null();
+    return !*null_value;
+  }
+
+  if (arg->result_type() == STRING_RESULT)
+  {
+    String *input= arg->val_str(value);
+    if (!input)
+    {
+      *null_value= true;
+      return false;
+    }
+
+    input->charset()->hash_sort(
+        hasher,
+        reinterpret_cast<const uchar *>(input->ptr()),
+        input->length());
+    *null_value= false;
+    return true;
+  }
+
+  const longlong num= arg->val_int();
+  if (arg->null_value)
+  {
+    *null_value= true;
+    return false;
+  }
+
+  const ulonglong num_u= static_cast<ulonglong>(num);
+  hasher->m_hash_num(
+      hasher,
+      reinterpret_cast<const uchar *>(&num_u),
+      sizeof(num_u));
+
+  *null_value= false;
+  return true;
+}
+} // namespace
+
 longlong Item_func_xxh32::val_int()
 {
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
-  String *input= args[0]->val_str(&value);
-  if (!input)
-  {
-    null_value= true;
+  Hasher hasher(my_hasher_xxh32());
+
+  if (!hash_xxh_arg(&hasher, args[0], &value, &null_value))
     return 0;
-  }
 
-  null_value= false;
-
-  my_hasher_st hasher= my_hasher_xxh32();
-  input->charset()->hash_sort(
-      &hasher,
-      reinterpret_cast<const uchar *>(input->ptr()),
-      input->length());
-
-  return (longlong) hasher.m_finalize(&hasher);
+  return static_cast<longlong>(hasher.finalize());
 }
 
 longlong Item_func_xxh3::val_int()
@@ -4598,22 +4641,12 @@ longlong Item_func_xxh3::val_int()
   DBUG_ASSERT(fixed());
   DBUG_ASSERT(arg_count == 1);
 
-  String *input= args[0]->val_str(&value);
-  if (!input)
-  {
-    null_value= true;
+  Hasher hasher(my_hasher_xxh3());
+
+  if (!hash_xxh_arg(&hasher, args[0], &value, &null_value))
     return 0;
-  }
 
-  null_value= false;
-
-  my_hasher_st hasher= my_hasher_xxh3();
-  input->charset()->hash_sort(
-      &hasher,
-      reinterpret_cast<const uchar *>(input->ptr()),
-      input->length());
-
-  return (longlong) hasher.m_finalize(&hasher);
+  return static_cast<longlong>(hasher.finalize());
 }
 
 #ifdef HAVE_COMPRESS

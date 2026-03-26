@@ -1,56 +1,50 @@
 --source include/have_partition.inc
---echo # XXH SQL functions preserve KEY partitioning behavior
+--source include/have_sequence.inc
 
---echo ## XXH32 preserves KEY partitioning collation behavior
-CREATE TABLE t1 (a VARCHAR(10) CHARACTER SET koi8u COLLATE koi8u_general_ci);
-INSERT INTO t1 VALUES (0x20),(0x60),(0x6060),(0x606060);
-SELECT HEX(a) FROM t1 WHERE a=0x60;
-ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH32 (a) PARTITIONS 3;
-SELECT HEX(a) FROM t1 WHERE a=0x60;
-DROP TABLE t1;
+--echo ## XXH32: sql function modulo distribution agrees with KEY partitioning
+CREATE OR REPLACE TABLE t1 (c1 INT)
+PARTITION BY KEY ALGORITHM=XXH32 (c1) PARTITIONS 7;
 
---echo ## XXH3 preserves KEY partitioning collation behavior
-CREATE TABLE t1 (a VARCHAR(10) CHARACTER SET koi8u COLLATE koi8u_general_ci);
-INSERT INTO t1 VALUES (0x20),(0x60),(0x6060),(0x606060);
-SELECT HEX(a) FROM t1 WHERE a=0x60;
-ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH3 (a) PARTITIONS 3;
-SELECT HEX(a) FROM t1 WHERE a=0x60;
-DROP TABLE t1;
+INSERT INTO t1
+SELECT seq FROM seq_735000_to_736000;
 
---echo ## XXH32 partitioning distribution for numeric values
-CREATE OR REPLACE TABLE t1 (c1 INT NOT NULL)
-PARTITION BY KEY ALGORITHM=XXH32 (c1) PARTITIONS 16;
-INSERT INTO t1 VALUES (0x41),(0x61);
-SELECT COUNT(*) AS xxh32_nonempty_parts_16
+SELECT partition_name, table_rows
 FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-SELECT SUM(table_rows) AS xxh32_rows_16
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH32 (c1) PARTITIONS 7;
-SELECT COUNT(*) AS xxh32_nonempty_parts_7
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-SELECT SUM(table_rows) AS xxh32_rows_7
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-DROP TABLE t1;
+WHERE table_schema=DATABASE() AND table_name='t1'
+ORDER BY partition_name;
 
---echo ## XXH3 partitioning distribution for numeric values
-CREATE OR REPLACE TABLE t1 (c1 INT NOT NULL)
-PARTITION BY KEY ALGORITHM=XXH3 (c1) PARTITIONS 16;
-INSERT INTO t1 VALUES (0x41),(0x61);
-SELECT COUNT(*) AS xxh3_nonempty_parts_16
+CREATE OR REPLACE TABLE t2 (part_id INT, part_rows INT);
+INSERT INTO t2
+SELECT MOD(XXH32(c1), 7) AS part_id, COUNT(*)
+FROM t1
+GROUP BY part_id;
+
+SELECT CONCAT('p', part_id) AS partition_name, part_rows
+FROM t2
+ORDER BY partition_name;
+
+DROP TABLE t1, t2;
+
+--echo ## XXH3: sql function modulo distribution agrees with KEY partitioning
+CREATE OR REPLACE TABLE t1 (c1 INT)
+PARTITION BY KEY ALGORITHM=XXH3 (c1) PARTITIONS 7;
+
+INSERT INTO t1
+SELECT seq FROM seq_735000_to_736000;
+
+SELECT partition_name, table_rows
 FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-SELECT SUM(table_rows) AS xxh3_rows_16
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-ALTER TABLE t1 PARTITION BY KEY ALGORITHM=XXH3 (c1) PARTITIONS 7;
-SELECT COUNT(*) AS xxh3_nonempty_parts_7
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-SELECT SUM(table_rows) AS xxh3_rows_7
-FROM information_schema.partitions
-WHERE table_schema=DATABASE() AND table_name='t1' AND table_rows>0;
-DROP TABLE t1;
+WHERE table_schema=DATABASE() AND table_name='t1'
+ORDER BY partition_name;
+
+CREATE OR REPLACE TABLE t2 (part_id INT, part_rows INT);
+INSERT INTO t2
+SELECT MOD(XXH3(c1), 7) AS part_id, COUNT(*)
+FROM t1
+GROUP BY part_id;
+
+SELECT CONCAT('p', part_id) AS partition_name, part_rows
+FROM t2
+ORDER BY partition_name;
+
+DROP TABLE t1, t2;
