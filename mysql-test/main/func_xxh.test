@@ -1,14 +1,26 @@
 SELECT XXH32('abc') = 2154901205 AS xxh32_expected;
-SELECT XXH32(11223344) = 1842591650 AS xxh32_num;
+SELECT XXH32(11223344) = 3848701555 AS xxh32_num;
 SELECT XXH32('abc') = XXH32('abc') AS xxh32_eq;
 SELECT XXH32(NULL) IS NULL AS xxh32_null;
 SELECT XXH32('') = 0 AS xxh32_empty;
 
 SELECT XXH3('abc') = 2615927343983396622 AS xxh3_expected;
-SELECT XXH3(11223344) = 12674657120826096761 AS xxh3_num;
+SELECT XXH3(11223344) = 18236575451877530578 AS xxh3_num;
 SELECT XXH3('abc') = XXH32('abc') AS xxh3_eq;
 SELECT XXH3(NULL) IS NULL AS xxh3_null;
 SELECT XXH3('') = 0 AS xxh3_empty;
+
+CREATE TABLE t (c INT, d VARCHAR(3)) DEFAULT CHARSET=latin1;
+INSERT INTO t VALUES (11223344, 'abc');
+
+SELECT XXH32(c) = XXH32(11223344) AS xxh32_col_eq,
+       XXH32(d) = XXH32('abc') AS xxh32_str_col_eq
+FROM t;
+SELECT XXH3(c) = XXH3(11223344) AS xxh3_col_eq,
+       XXH3(d) = XXH3('abc') AS xxh3_str_col_eq
+FROM t;
+
+DROP TABLE t;
 
 SELECT XXH32(' ') = XXH32('    ') AS xxh32_space_eq;
 SELECT XXH3(' ') = XXH3('    ') AS xxh3_space_eq;

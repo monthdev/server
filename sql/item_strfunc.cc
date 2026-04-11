@@ -4576,10 +4576,64 @@ longlong Item_func_crc32::val_int()
 
 namespace
 {
+uint xxh_int_storage_length(const Type_handler *handler)
+{
+  if (handler == &type_handler_bool ||
+      handler == &type_handler_stiny ||
+      handler == &type_handler_utiny)
+    return 1;
+
+  if (handler == &type_handler_sshort ||
+      handler == &type_handler_ushort)
+    return 2;
+
+  if (handler == &type_handler_sint24 ||
+      handler == &type_handler_uint24)
+    return 3;
+
+  if (handler == &type_handler_slong ||
+      handler == &type_handler_slong_ge0 ||
+      handler == &type_handler_ulong)
+    return 4;
+
+  if (handler == &type_handler_slonglong ||
+      handler == &type_handler_ulonglong)
+    return 8;
+
+  return 0;
+}
+
+
+void store_xxh_int(uchar *to, ulonglong num, uint length)
+{
+  switch (length) {
+  case 1:
+    to[0]= static_cast<uchar>(num);
+    break;
+  case 2:
+    int2store(to, num);
+    break;
+  case 3:
+    int3store(to, num);
+    break;
+  case 4:
+    int4store(to, num);
+    break;
+  case 8:
+    int8store(to, num);
+    break;
+  default:
+    DBUG_ASSERT(0);
+  }
+}
+
+
 bool hash_xxh_arg(Hasher *hasher, Item *arg, String *value, bool *null_value)
 {
-  if (Item_field *item_field= arg->real_item()->field_for_view_update())
+  Item *real_arg= arg->real_item();
+  if (real_arg->type() == Item::FIELD_ITEM)
   {
+    Item_field *item_field= static_cast<Item_field *>(real_arg);
     Field *field= item_field->field;
     if (!field)
     {
@@ -4616,11 +4670,24 @@ bool hash_xxh_arg(Hasher *hasher, Item *arg, String *value, bool *null_value)
     return false;
   }
 
+  if (arg->result_type() == INT_RESULT)
+  {
+    const uint length=
+      xxh_int_storage_length(arg->type_handler()->type_handler_for_tmp_table(arg));
+    if (length)
+    {
+      uchar tmp[8];
+      store_xxh_int(tmp, static_cast<ulonglong>(num), length);
+      hasher->m_hash_num(hasher, tmp, length);
+      *null_value= false;
+      return true;
+    }
+  }
+
   const ulonglong num_u= static_cast<ulonglong>(num);
-  hasher->m_hash_num(
-      hasher,
-      reinterpret_cast<const uchar *>(&num_u),
-      sizeof(num_u));
+  hasher->m_hash_num(hasher,
+                     reinterpret_cast<const uchar *>(&num_u),
+                     sizeof(num_u));
 
   *null_value= false;
   return true;
